@@ -1,17 +1,24 @@
 package com.example.pagging3example
 
 import android.os.Bundle
+import android.view.View
+import android.widget.ProgressBar
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.Observer
+import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.paging.LoadState
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.pagging3example.paging.QuotePagingAdapter
 import com.example.pagging3example.viewmodel.QuoteViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -19,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
         lateinit var quoteViewModel: QuoteViewModel
         lateinit var recyclerView: RecyclerView
+        lateinit var progressBar: ProgressBar
         lateinit var adapter: QuotePagingAdapter
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -26,6 +34,9 @@ class MainActivity : AppCompatActivity() {
 
 
         recyclerView = findViewById(R.id.quoteList)
+
+        progressBar = findViewById(R.id.progressBar)
+
 
         quoteViewModel = ViewModelProvider(this).get(QuoteViewModel::class.java)
 
@@ -42,9 +53,20 @@ class MainActivity : AppCompatActivity() {
         recyclerView.setHasFixedSize(true)
         recyclerView.adapter = adapter
 
-        quoteViewModel.list.observe(this) {
-            adapter.submitData(lifecycle, it)
-            it.apply {  }
+        lifecycleScope.launch {
+            quoteViewModel.list.observe(this@MainActivity) {
+                adapter.submitData(lifecycle, it)
+            }
+        }
+        lifecycleScope.launch(Dispatchers.Main) {
+            adapter.loadStateFlow.collectLatest { loadStates ->
+                if (loadStates.refresh is LoadState.Loading) {
+                    println("loading state*****")
+                    progressBar?.visibility = View.VISIBLE
+                } else {
+                    progressBar?.visibility = View.GONE
+                }
+            }
         }
     }
 }
